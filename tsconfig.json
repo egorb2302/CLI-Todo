@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "target": "es2022",
+    "module": "commonjs",
+    "types": ["node"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true
+  }
+}
