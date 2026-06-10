@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { Task } from "../types/types";
+import { Task } from "../types/types"
+import { getTasks } from "../app.js"
 
 const fs = require('fs/promises');
 
@@ -17,13 +18,15 @@ export const taskInfo = async (task: Task): Promise<string | void> => {
     is completed: ${task.isCompleted ? chalk.bgGreen('  ') : chalk.bgRed('  ')}`)
 }
 
-export const Greeting = (): void => {
-    console.log("CLI-TODO-LIST!")
-    console.log("Your tasks:")
-    console.log("----------")
-}
+export const Greeting = async () => {
+    console.log(chalk.cyan.bold('\n📝 CLI Task Manager v1.0\n'));
+    const tasks = await getTasks();
+    if (!tasks) throw new Error("Cant read tasks for greeting")
+
+    const completed = tasks.filter(t => t.isCompleted).length;
+    console.log(chalk.gray(`📊 У вас ${tasks.length} задач, ${completed} выполнено\n`));
+};
 
 export const Help = async (): Promise<void> => {
-    console.log("----------")
-    console.log(`Commands: add, all, delete, exit, current`)
+    console.log(`Commands: add, all, delete, exit, details`)
 }
