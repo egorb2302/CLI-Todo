@@ -28,5 +28,5 @@ export const Greeting = async () => {
 };
 
 export const Help = async (): Promise<void> => {
-    console.log(`Commands: add, all, delete, exit, details`)
+    console.log(`Commands: add, all, delete, exit, details, complete`)
 }

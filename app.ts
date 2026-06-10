@@ -136,6 +136,11 @@ const showDetails = async (count: number): Promise<Task | undefined> => {
         if (!tasks) throw new Error("Cant get tasks for showing details")
         const taskIndex = count - 1;
 
+        if (taskIndex < 0 || taskIndex >= tasks.length) {
+            console.log(chalk.red(`❌ Задачи с номером ${count} не существует`));
+            return;
+        }
+
         const current = tasks[taskIndex]
         console.log(`Task ${taskIndex}:\n\nTitle: ${current.title}
 ${chalk.gray.italic("ID: ")}${chalk.gray.italic(current.id)}\nDescription: ${current.description}
@@ -165,6 +170,48 @@ const showDetailsInteractive = async () => {
     showDetails(answers.count)
 }
 
+const completeTask = async (count: number): Promise<Task | undefined> => {
+    let tasks = await getTasks();
+
+    try {
+        if (!tasks) throw new Error("Cant get tasks for remove")
+        const taskIndex = count - 1;
+        
+        if (taskIndex < 0 || taskIndex >= tasks.length) {
+            console.log(chalk.red(`❌ Задачи с номером ${count} не существует`));
+            return;
+        }
+
+        const current = tasks[taskIndex];
+        const filePath = path.resolve(__dirname, "tasks", `task${current.id}.json`)
+        const newData = { ...current, isCompleted: true, id: current.id };
+        await fs.writeFile(filePath, JSON.stringify(newData), "utf-8")
+        console.log(chalk.green(`✅ Задача "${tasks[taskIndex].title}" выполнена!`));
+    } catch (err) {
+        console.error(err)
+        return
+    }
+}
+
+const completeTaskInteractive = async () => {
+    const answers = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'count',
+            message: 'Введите номер задачи:',
+            validate: (input: string) => {
+                if (!input) return 'Введите номер задачи';
+                const num = parseInt(input);
+                if (isNaN(num)) return 'Введите число';
+                if (num < 1) return 'Номер должен быть больше 0';
+                return true;   
+            }
+        }
+    ]);
+
+    completeTask(answers.count)
+}
+
 const Exit = async () => {
     console.log(chalk.yellow('\n👋 До свидания!\n'));
     rl.close();
@@ -187,6 +234,9 @@ const CommandHandler = async (input: string): Promise<void> => {
             break;
         case 'details': 
             await showDetailsInteractive();
+            break;
+        case 'complete':
+            await completeTaskInteractive();
             break;
         case 'exit':
             await Exit();
