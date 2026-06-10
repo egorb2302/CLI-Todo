@@ -1,5 +1,6 @@
 import { fileReader, Greeting, Help } from './func/func.js'
 import type { Task, CommandEvent } from './types/types.ts'
+import inquirer from 'inquirer'
 
 const path = require('path')
 const fs = require('fs/promises')
@@ -32,49 +33,164 @@ const createTask = async (title: string, description: string, isCompleted: boole
     }
 }
 
-const removeTask = async (id: string): Promise<void> => {
+const createTaskInteractive = async () => {
+    const answers = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'title',
+            message: 'Название задачи:',
+            validate: (input: string) => input.length > 0 || 'Название не может быть пустым'
+        },
+        {
+            type: 'input',
+            name: 'description',
+            message: 'Описание (можно пропустить):',
+            default: 'Нет описания'
+        },
+        {
+            type: 'confirm',
+            name: 'isCompleted',
+            message: 'Сразу отметить как выполненную?',
+            default: false
+        }
+    ]);
+    
+    await createTask(answers.title, answers.description, answers.isCompleted);
+};
 
+const removeTask = async (count: number): Promise<void> => {
+    const tasks = await getTasks();
+
+    try {
+        if (!tasks) throw new Error("Cant get tasks for remove")
+        const taskIndex = count - 1;
+        
+        if (taskIndex < 0 || taskIndex >= tasks.length) {
+            console.log(chalk.red(`❌ Задачи с номером ${count} не существует`));
+            return;
+        }
+
+        const filePath = path.resolve(__dirname, "tasks", `task${tasks[taskIndex].id}.json`)
+        await fs.rm(filePath)
+        console.log(chalk.green(`✅ Задача "${tasks[taskIndex].title}" успешно удалена!`));
+    } catch (err) {
+        console.error(err)
+        return
+    }
 }
 
-const getTasks = async (): Promise<undefined | Task[]> => {
+const removeTaskInteractive = async () => {
+    const answers = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'count',
+            message: 'Введите номер задачи:',
+            validate: (input: string) => {
+                if (!input) return 'Введите номер задачи';
+                const num = parseInt(input);
+                if (isNaN(num)) return 'Введите число';
+                if (num < 1) return 'Номер должен быть больше 0';
+                return true;
+            }
+        },
+        {
+            type: 'confirm',
+            name: 'deleting',
+            message: 'Вы точно хотите удалить задачу?',
+            default: true
+        }
+    ]);
+
+    if (answers.deleting) {
+        await removeTask(answers.count)
+    } else {
+        rl.prompt()
+    }
+}
+
+export const getTasks = async (): Promise<undefined | Task[]> => {
     const tasks: Task[] = []; 
 
     try {
         const folderPath: string = path.resolve(__dirname, "tasks")
         const data = await fs.opendir(folderPath)
-        let entry = await data.read()
 
-        while (entry !== null) {
-            const task = await fileReader(path.resolve(__dirname, "tasks", entry.name))
-            tasks.push(JSON.parse(task))
-            entry = await data.read()
+        for await (const entry of data) {
+            if (entry.isFile() && entry.name.endsWith('.json')) {
+                const content = await fileReader(path.resolve(folderPath, entry.name));
+                tasks.push(JSON.parse(content));
+            }
         }
-
-        await data.close()
     } catch (err) {
         console.error(err)
         return
     }
 
-    tasks.forEach((task) => {
-        console.log(`Task ${(tasks.indexOf(task)) + 1}: ${chalk.green(task.title)}`)
-    })
-
     return tasks.sort((a, b) => b.id - a.id);
 }
 
-const CommandHandler = async (input: CommandEvent): Promise<void> => {
-    const { command } = input;
+const showDetails = async (count: number): Promise<Task | undefined> => {
+    const tasks = await getTasks();
+
+    try {
+        if (!tasks) throw new Error("Cant get tasks for showing details")
+        const taskIndex = count - 1;
+
+        const current = tasks[taskIndex]
+        console.log(`Task ${taskIndex}:\n\nTitle: ${current.title}
+${chalk.gray.italic("ID: ")}${chalk.gray.italic(current.id)}\nDescription: ${current.description}
+IsCompleted: ${current.isCompleted ? chalk.green(current.isCompleted) : current.isCompleted}`)
+    } catch (err) {
+        console.error(err)
+        return
+    }
+}
+
+const showDetailsInteractive = async () => {
+    const answers = await inquirer.prompt([
+        {
+            type: 'input',
+            name: 'count',
+            message: 'Введите номер задачи:',
+            validate: (input: string) => {
+                if (!input) return 'Введите номер задачи';
+                const num = parseInt(input);
+                if (isNaN(num)) return 'Введите число';
+                if (num < 1) return 'Номер должен быть больше 0';
+                return true;   
+            }
+        }
+    ]);
+
+    showDetails(answers.count)
+}
+
+const Exit = async () => {
+    console.log(chalk.yellow('\n👋 До свидания!\n'));
+    rl.close();
+    process.exit(1);
+}
+
+const CommandHandler = async (input: string): Promise<void> => {
+    const trimmed = input.trim().toLowerCase();
+    const [command] = trimmed.split(' ');
 
     switch(command) {
         case 'add':
+            await createTaskInteractive();
             break;
         case 'list':
+            await getTasks();
             break;
         case 'delete':
+            await removeTaskInteractive();
+            break;
+        case 'details': 
+            await showDetailsInteractive();
             break;
         case 'exit':
-            process.exit(1)
+            await Exit();
+            break;
         default:
             await Help()
     }
@@ -83,11 +199,36 @@ const CommandHandler = async (input: CommandEvent): Promise<void> => {
 }
 
 const RunProgram = async (): Promise<void> => {
+    const tasks = await getTasks()
     Greeting()
-    await getTasks()
+
+    if (tasks && tasks.length > 0) {
+        console.log(chalk.cyan('\n📋 Последние задачи:'));
+        tasks.slice(-5).forEach(task => {
+            const status = task.isCompleted ? '✅' : '⬜';
+            console.log(`Task ${(tasks.indexOf(task)) + 1}:\n ${status} ${task.title} ${chalk.gray.italic("ID:")} ${chalk.gray.italic(task.id)}`);
+        });
+    }
+
     rl.prompt()
 
-    rl.on('line', CommandHandler)
+    rl.on('line', async (input: string) => {
+        const trimmed = input.trim();
+        
+        if (trimmed === '') {
+            console.log(chalk.gray('💡 Введите "help" для списка команд'));
+            rl.prompt();
+            return;
+        }
+        
+        await CommandHandler(trimmed);
+        rl.prompt();
+    })
+
+    rl.on('close', () => {
+        console.log(chalk.yellow('\n👋 До свидания!\n'));
+        process.exit(0);
+    });
 }
 
 RunProgram()
