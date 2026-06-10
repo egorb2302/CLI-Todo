@@ -4,3 +4,8 @@ export interface Task {
     isCompleted: boolean,
     description?: string
 }
+
+export type CommandEvent = {
+    command: string;
+    args: string[];
+}

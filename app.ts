@@ -1,8 +1,11 @@
-const Task = require('./types/types.ts');
+import { fileReader, Greeting, Help } from './func/func.js'
+
+const Task = require('./types/types.ts')
+const CommandEvent = require('./types/types.ts')
 const path = require('path')
-const dotenv = require('dotenv')
-const fs = require('fs')
+const fs = require('fs/promises')
 const readline = require('readline')
+const chalk = require('chalk')
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -30,8 +33,60 @@ const createTask = async (title: string, description: string, isCompleted: boole
     }
 }
 
+const removeTask = async (id: string): Promise<void> => {
+
+}
+
+const getTasks = async (): Promise<undefined | void> => {
+    const tasks: typeof Task[] = []; 
+
+    try {
+        const folderPath: string = path.resolve(__dirname, "tasks")
+        const data = await fs.opendir(folderPath)
+        let entry = await data.read()
+
+        while (entry !== null) {
+            const task = await fileReader(path.resolve(__dirname, "tasks", entry.name))
+            tasks.push(JSON.parse(task))
+            entry = await data.read()
+        }
+
+        await data.close()
+    } catch (err) {
+        console.error(err)
+        return
+    }
+
+    tasks.forEach((task) => {
+        console.log(`Task ${(tasks.indexOf(task)) + 1}: ${chalk.green(task.title)}`)
+    })
+}
+
+const CommandHandler = async (input: typeof CommandEvent): Promise<void> => {
+    const { command } = input;
+
+    switch(command) {
+        case 'add':
+            break;
+        case 'list':
+            break;
+        case 'delete':
+            break;
+        case 'exit':
+            process.exit(1)
+        default:
+            await Help()
+    }
+    
+    rl.prompt();
+}
+
 const RunProgram = async (): Promise<void> => {
-    await createTask('test', 'test for my cli todo')
+    Greeting()
+    await getTasks()
+    rl.prompt()
+
+    rl.on('line', CommandHandler)
 }
 
 RunProgram()
